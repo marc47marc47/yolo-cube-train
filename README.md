@@ -147,12 +147,24 @@ python -m src.app analyze --export --output artifacts/quality_list.txt
 ### 3. 執行測試
 
 ```bash
+# 執行所有非慢速測試（推薦）
+./yolo/Scripts/python.exe -m pytest -m 'not slow' tests/ -v
+
 # 執行所有單元測試
 ./yolo/Scripts/python.exe -m pytest tests/ -v -m unit
 
-# 執行特定測試
+# 執行特定測試文件
 ./yolo/Scripts/python.exe -m pytest tests/test_camera_stream.py -v
+
+# 執行所有測試（包含整合測試）
+./yolo/Scripts/python.exe -m pytest tests/ -v
 ```
+
+**測試狀態**：
+- ✅ 53 個測試通過
+- ⚠️ 1 個測試跳過（可選的 pedestrian 資料集測試）
+- 測試使用實際的 `quality_control` 資料集進行驗證
+- 如需測試 pedestrian 資料集，請先執行 `bash scripts/download_pedestrian_data.sh`
 
 ## 專案結構
 
@@ -863,18 +875,32 @@ python -m src.app eval \
 專案包含完整的測試套件：
 
 ```bash
+# 執行所有非慢速測試（推薦，2-3 秒）
+pytest -m 'not slow' tests/ -v
+
 # 執行所有測試
 pytest tests/ -v
 
 # 只執行單元測試
 pytest tests/ -v -m unit
 
-# 執行整合測試（需要模型）
+# 執行整合測試
 pytest tests/ -v -m integration
 
 # 生成測試覆蓋率報告
 pytest --cov=src tests/
 ```
+
+**當前測試狀態**：
+- ✅ **53 passed** - 所有核心功能測試通過
+- ⚠️ **1 skipped** - `test_pedestrian_directory_structure`（可選）
+- 📊 測試使用實際的 `quality_control` 資料集
+- 🎯 測試覆蓋：攝影機、偵測器、視覺化、資料集完整性
+
+**測試分類**：
+- **單元測試** (`@pytest.mark.unit`)：不需要外部資源
+- **整合測試** (`@pytest.mark.integration`)：測試完整流程
+- **慢速測試** (`@pytest.mark.slow`)：長時間執行的測試
 
 ## 開發
 

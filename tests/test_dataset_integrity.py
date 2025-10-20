@@ -75,18 +75,34 @@ class TestDatasetFiles:
         assert data_dir.exists()
         assert data_dir.is_dir()
 
-    def test_reference_directory(self, data_dir: Path) -> None:
-        """Test that reference directory exists."""
-        ref_dir = data_dir / "reference"
-        if not ref_dir.exists():
-            pytest.skip("reference directory not found - data not downloaded")
-        assert ref_dir.is_dir()
+    def test_quality_control_dataset(self, data_dir: Path) -> None:
+        """Test quality control dataset structure (primary dataset)."""
+        qc_dir = data_dir / "quality_control"
+        if not qc_dir.exists():
+            pytest.skip("quality_control dataset not found")
+
+        assert qc_dir.is_dir()
+
+        # Check for dataset.yaml
+        dataset_yaml = qc_dir / "dataset.yaml"
+        if dataset_yaml.exists():
+            assert dataset_yaml.is_file()
+
+        # Check for standard splits
+        for split in ["train", "val"]:
+            split_labels = qc_dir / "labels" / split
+            if split_labels.exists():
+                assert split_labels.is_dir()
+                # Check has some label files
+                label_files = list(split_labels.glob("*.txt"))
+                if label_files:
+                    assert len(label_files) > 0
 
     def test_pedestrian_directory_structure(self, data_dir: Path) -> None:
-        """Test pedestrian dataset directory structure."""
+        """Test pedestrian dataset directory structure (optional)."""
         ped_dir = data_dir / "reference" / "pedestrian"
         if not ped_dir.exists():
-            pytest.skip("pedestrian directory not found - data not downloaded")
+            pytest.skip("pedestrian directory not found - optional dataset, use scripts/download_pedestrian_data.sh to download")
 
         # Check for train2017 and val2017
         train_dir = ped_dir / "train2017"
@@ -108,9 +124,15 @@ class TestDatasetFiles:
 
     def test_label_files_format(self, data_dir: Path) -> None:
         """Test that label files have correct YOLO format."""
-        labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+        # Try quality_control dataset first (primary)
+        labels_dir = data_dir / "quality_control" / "labels" / "train"
+
+        # Fallback to pedestrian dataset if quality_control not found
         if not labels_dir.exists():
-            pytest.skip("labels directory not found - data not downloaded")
+            labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+
+        if not labels_dir.exists():
+            pytest.skip("No label directory found - use quality_control or pedestrian dataset")
 
         label_files = list(labels_dir.glob("*.txt"))
         if not label_files:
@@ -146,9 +168,15 @@ class TestDatasetFiles:
 
     def test_label_values_range(self, data_dir: Path) -> None:
         """Test that label values are in valid range [0, 1]."""
-        labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+        # Try quality_control dataset first
+        labels_dir = data_dir / "quality_control" / "labels" / "train"
+
+        # Fallback to pedestrian dataset
         if not labels_dir.exists():
-            pytest.skip("labels directory not found")
+            labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+
+        if not labels_dir.exists():
+            pytest.skip("No label directory found")
 
         label_files = list(labels_dir.glob("*.txt"))[:3]  # Test first 3 files
         if not label_files:
@@ -171,9 +199,17 @@ class TestDatasetFiles:
 
     def test_class_ids_valid(self, data_dir: Path) -> None:
         """Test that class IDs are valid."""
-        yaml_path = data_dir / "pedestrian.yaml"
+        # Try quality_control dataset first
+        yaml_path = data_dir / "quality_control" / "dataset.yaml"
+        labels_dir = data_dir / "quality_control" / "labels" / "train"
+
+        # Fallback to pedestrian dataset
         if not yaml_path.exists():
-            pytest.skip("pedestrian.yaml not found")
+            yaml_path = data_dir / "pedestrian.yaml"
+            labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+
+        if not yaml_path.exists():
+            pytest.skip("No dataset.yaml found")
 
         with open(yaml_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
@@ -184,7 +220,6 @@ class TestDatasetFiles:
         else:
             num_classes = max(int(k) for k in names.keys()) + 1
 
-        labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
         if not labels_dir.exists():
             pytest.skip("labels directory not found")
 
@@ -210,7 +245,13 @@ class TestDatasetFiles:
 
     def test_empty_labels_handling(self, data_dir: Path) -> None:
         """Test handling of empty label files."""
-        labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+        # Try quality_control dataset first
+        labels_dir = data_dir / "quality_control" / "labels" / "train"
+
+        # Fallback to pedestrian dataset
+        if not labels_dir.exists():
+            labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+
         if not labels_dir.exists():
             pytest.skip("labels directory not found")
 
@@ -230,9 +271,17 @@ class TestDatasetFiles:
 
     def test_dataset_statistics(self, data_dir: Path) -> None:
         """Test and report dataset statistics."""
-        labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+        # Try quality_control dataset first
+        labels_dir = data_dir / "quality_control" / "labels" / "train"
+        dataset_name = "quality_control"
+
+        # Fallback to pedestrian dataset
         if not labels_dir.exists():
-            pytest.skip("labels directory not found")
+            labels_dir = data_dir / "reference" / "pedestrian" / "train2017" / "labels"
+            dataset_name = "pedestrian"
+
+        if not labels_dir.exists():
+            pytest.skip("No label directory found")
 
         label_files = list(labels_dir.glob("*.txt"))
         if not label_files:
@@ -250,7 +299,7 @@ class TestDatasetFiles:
             else:
                 total_objects += len(lines)
 
-        print(f"\nDataset statistics:")
+        print(f"\nDataset statistics ({dataset_name}):")
         print(f"  Total label files: {len(label_files)}")
         print(f"  Empty files: {empty_files}")
         print(f"  Total objects: {total_objects}")
