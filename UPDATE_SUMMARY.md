@@ -45,6 +45,42 @@ python -m src.app eval \
 - ✅ UPDATE_SUMMARY.md - 更新已訓練模型資訊
 - ✅ UPDATE_SUMMARY.md - 更新模型性能狀態
 
+### 架構重構說明 (2025-10-20)
+
+**重大變更**：所有 Python 腳本已遷移至 `src/` 目錄，統一透過 CLI 調用
+
+**變更前**：
+```bash
+# 舊的命令方式（已廢棄）
+python scripts/analyze_quality_data.py
+python scripts/prepare_quality_dataset.py --mode quality
+python scripts/train_qc.py --data data.yaml
+python scripts/quality_inspector.py --model best.pt --source 0
+```
+
+**變更後**：
+```bash
+# 新的統一 CLI 方式
+python -m src.app analyze
+python -m src.app prepare-data --mode quality
+python -m src.app train-qc --data data.yaml
+python -m src.app inspect --model best.pt --source 0
+```
+
+**Shell 腳本**保持不變，內部已更新為調用新的 CLI：
+```bash
+bash scripts/1-label-capture.sh      # 啟動標記模式
+bash scripts/2-label-analyze.sh      # 分析品質資料
+bash scripts/3-label-prepare-train.sh # 準備訓練
+bash scripts/5-label-prev.sh         # 品質檢測
+```
+
+**優點**：
+- ✅ 統一的命令介面，更易於使用
+- ✅ 更好的程式碼組織結構
+- ✅ 支援 `--help` 查看所有命令
+- ✅ 模組化設計，易於維護和擴展
+
 ---
 
 ## ✅ 已更新的文件
@@ -111,35 +147,49 @@ python -m src.app eval \
 
 ```
 src/
-├── app/
-│   ├── realtime.py          ✅ 已完成（含品質標記功能）
-│   ├── __main__.py          ✅ 已完成
-│   └── __init__.py          ✅ 已完成
-├── camera/
-│   ├── stream.py            ✅ 已完成（VideoStream 類別）
-│   └── __init__.py          ✅ 已完成
-├── detector/
-│   ├── yolo.py              ✅ 已完成（YoloDetector 類別）
-│   └── __init__.py          ✅ 已完成
-└── visualize/
-    ├── overlay.py           ✅ 已完成（Overlay 類別）
-    └── __init__.py          ✅ 已完成
+├── app/                             # 主程式與統一 CLI
+│   ├── cli.py                       ✅ 統一命令列介面
+│   ├── realtime.py                  ✅ 即時推論（含品質標記）
+│   ├── __main__.py                  ✅ CLI 入口點
+│   └── __init__.py
+├── analysis/                        # 資料分析
+│   └── analyze_quality_data.py      ✅ 品質資料分析
+├── camera/                          # 攝影機模組
+│   └── stream.py                    ✅ VideoStream 類別
+├── data_utils/                      # 資料處理
+│   ├── prepare_quality_dataset.py   ✅ 資料集準備
+│   └── verify_dataset.py            ✅ 資料集驗證
+├── detector/                        # YOLO 偵測器
+│   └── yolo.py                      ✅ YoloDetector 類別
+├── evaluation/                      # 模型評估
+│   └── evaluate_pedestrian.py       ✅ 模型評估
+├── inference/                       # 推論模組
+│   └── quality_inspector.py         ✅ 品質檢測系統
+├── training/                        # 模型訓練
+│   ├── train_pedestrian.py          ✅ 行人偵測訓練
+│   └── train_qc.py                  ✅ 品質管理訓練
+├── utils/                           # 工具函式
+│   └── check_cuda.py                ✅ CUDA 檢查
+└── visualize/                       # 視覺化
+    └── overlay.py                   ✅ Overlay 類別
 ```
 
-### 品質管理腳本 (scripts/)
+### Shell 腳本工具 (scripts/)
 
 ```
-品質管理系統：
-├── analyze_quality_data.py      ✅ 已完成（統計分析）
-├── prepare_quality_dataset.py   ✅ 已完成（資料集準備）
-├── train_qc.py                  ✅ 已完成（訓練模型）
-└── quality_inspector.py         ✅ 已完成（品質檢測系統）
+Shell 腳本（調用 src.app CLI）：
+├── 0-install_with_uv.sh             ✅ 安裝環境
+├── 1-label-capture.sh               ✅ 快速啟動標記
+├── 2-label-analyze.sh               ✅ 分析品質資料
+├── 3-label-prepare-train.sh         ✅ 準備訓練資料
+├── 4-label-train.sh                 ✅ 訓練模型
+├── 5-label-prev.sh                  ✅ 品質檢測預覽
+├── download_pedestrain_data.sh      ✅ 下載資料集
+├── test_data.sh                     ✅ 測試資料集
+└── train_all.sh                     ✅ 完整訓練流程
 
-工具腳本：
-├── check_cuda.py                ✅ 已完成
-├── verify_dataset.py            ✅ 已完成
-├── train_all.sh                 ✅ 已完成
-└── quality-inspect.sh           ✅ 已完成
+注意：Python 功能已全部遷移至 src/ 目錄，
+      透過統一的 CLI (python -m src.app) 調用
 ```
 
 ### 測試 (tests/)
@@ -238,53 +288,71 @@ artifacts/runs/qc/
 
 ### 環境建置
 ```bash
-bash scripts/install_with_uv.sh
+bash scripts/0-install_with_uv.sh
 source yolo/Scripts/activate  # Windows
 ```
 
 ### 收集品質資料
 ```bash
-python -m src.app --source 0 --show
+# 方法 1：直接使用 CLI
+python -m src.app realtime --source 0 --show
 # 按 0-9 鍵標記品質
+
+# 方法 2：使用 shell 腳本
+bash scripts/1-label-capture.sh
 ```
 
 ### 分析資料
 ```bash
-python scripts/analyze_quality_data.py
+# 方法 1：使用 CLI
+python -m src.app analyze
+
+# 方法 2：使用 shell 腳本
+bash scripts/2-label-analyze.sh
+
+# 匯出品質清單
+python -m src.app analyze --export --output artifacts/quality_list.txt
 ```
 
 ### 準備資料集
 ```bash
 # 二分類
-python scripts/prepare_quality_dataset.py --mode binary
+python -m src.app prepare-data --mode binary
 
 # 三分類
-python scripts/prepare_quality_dataset.py --mode triclass
+python -m src.app prepare-data --mode triclass
 
 # 10 級品質分類
-python scripts/prepare_quality_dataset.py --mode quality
+python -m src.app prepare-data --mode quality
+
+# 或使用 shell 腳本
+bash scripts/3-label-prepare-train.sh
 ```
 
 ### 訓練模型
 ```bash
-# 快速訓練
+# 快速訓練（使用 shell 腳本）
 bash scripts/train_all.sh
 
-# 手動訓練
-python scripts/train_qc.py \
-    --data data/quality_scores/dataset.yaml \
+# 手動訓練（使用 CLI）
+python -m src.app train-qc \
+    --data data/quality_control/dataset.yaml \
     --model yolov8n.pt \
     --epochs 50 \
-    --device cuda
+    --device 0
 ```
 
 ### 品質檢測
 ```bash
-python scripts/quality_inspector.py \
+# 方法 1：使用 CLI
+python -m src.app inspect \
     --model artifacts/runs/qc/quality_control_v13/weights/best.pt \
     --source 0 \
     --conf 0.25 \
     --device cuda
+
+# 方法 2：使用 shell 腳本（自動找最新模型）
+bash scripts/5-label-prev.sh 0.25
 ```
 
 ### 模型評估
@@ -302,6 +370,18 @@ model = YOLO('artifacts/runs/qc/quality_control_v13/weights/best.pt')
 print(f'Classes: {model.model.nc}')
 print(f'Names: {model.names}')
 "
+```
+
+### 其他工具命令
+```bash
+# 檢查 CUDA
+python -m src.app check-cuda
+
+# 驗證資料集
+python -m src.app verify-data --config data/quality_control/dataset.yaml
+
+# 查看所有可用命令
+python -m src.app --help
 ```
 
 ### 執行測試

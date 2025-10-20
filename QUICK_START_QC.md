@@ -32,7 +32,10 @@ python -m src.app --source 0 --show
 
 ```bash
 # 查看品質分布統計
-python scripts/analyze_quality_data.py
+python -m src.app analyze
+
+# 或使用 shell 腳本
+bash scripts/2-label-analyze.sh
 
 # 輸出範例：
 # ============================================================
@@ -93,7 +96,7 @@ python -m src.app --source 0 --model yolov8n.pt --conf 0.5 --show
 收集 100 個產品樣本後：
 
 ```bash
-python scripts/analyze_quality_data.py
+python -m src.app analyze
 ```
 
 可得到：
@@ -223,15 +226,15 @@ git commit -m "Daily QC data: $(date +%Y-%m-%d)"
 創建每日品質報告：
 
 ```bash
-# 生成 HTML 報告（需自行開發）
-python scripts/generate_qc_report.py --date today --output reports/qc_report.html
+# 生成 HTML 報告（待開發功能）
+# python -m src.app generate-report --date today --output reports/qc_report.html
 ```
 
 ### 匯出統計資料
 
 ```bash
-# 匯出為 CSV
-python scripts/analyze_quality_data.py --export --output quality_data.csv
+# 匯出為品質清單
+python -m src.app analyze --export --output artifacts/quality_list.txt
 
 # 可用 Excel 或其他工具進一步分析
 ```
@@ -239,8 +242,8 @@ python scripts/analyze_quality_data.py --export --output quality_data.csv
 ### 設定品質閾值告警
 
 ```bash
-# 如果缺陷率 > 20%，自動告警（需自行開發）
-python scripts/quality_alert.py --threshold 0.2 --notify email
+# 如果缺陷率 > 20%，自動告警（待開發功能）
+# python -m src.app alert --threshold 0.2 --notify email
 ```
 
 ---
@@ -283,16 +286,16 @@ rm -rf artifacts/screenshots/*
 
 ```bash
 # 1. 查看當前分布
-python scripts/analyze_quality_data.py
+python -m src.app analyze
 
 # 2. 針對性收集不足的品質等級
 # 例如：如果 quality_3 只有 10 張，繼續收集此等級
 
-python -m src.app --source 0 --show
+python -m src.app realtime --source 0 --show
 # 專門收集品質 3 的樣本，按 '3' 鍵
 
 # 3. 重新檢查分布
-python scripts/analyze_quality_data.py
+python -m src.app analyze
 ```
 
 ---
@@ -330,7 +333,7 @@ python scripts/analyze_quality_data.py
 # 目標：每日生產 1000 個零件，自動記錄品質
 
 # Day 1: 收集基線資料
-python -m src.app --source 0 --show
+python -m src.app realtime --source 0 --show
 # 收集 500 張 → 分析品質分布
 
 # Day 2-7: 持續監控
@@ -339,7 +342,7 @@ python -m src.app --source 0 --show
 # 對比週一到週五的差異
 
 # Day 8: 生成報告
-python scripts/analyze_quality_data.py --export
+python -m src.app analyze --export --output weekly_report.txt
 # 週報告：平均品質、缺陷率、改善建議
 ```
 
@@ -359,11 +362,11 @@ python scripts/analyze_quality_data.py --export
 
 開始收集資料：
 
-- [ ] 執行 `python -m src.app --source 0 --show`
+- [ ] 執行 `python -m src.app realtime --source 0 --show`
 - [ ] 測試按數字鍵截圖功能
 - [ ] 確認截圖儲存位置
 - [ ] 收集至少 50 張各品質等級
-- [ ] 執行 `python scripts/analyze_quality_data.py`
+- [ ] 執行 `python -m src.app analyze`
 - [ ] 檢查品質分布是否平衡
 
 ---
@@ -372,7 +375,10 @@ python scripts/analyze_quality_data.py --export
 
 ```bash
 # 立即開始
-python -m src.app --source 0 --show
+python -m src.app realtime --source 0 --show
+
+# 或使用 shell 腳本
+bash scripts/1-label-capture.sh
 
 # 開始標記品質，按 0-9 鍵！
 ```

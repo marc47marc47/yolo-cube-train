@@ -135,10 +135,13 @@ python -m src.app --source 0 --show
 **分析收集的資料**：
 ```bash
 # 查看品質分布統計
-python scripts/analyze_quality_data.py
+python -m src.app analyze
+
+# 或使用 shell 腳本
+bash scripts/2-label-analyze.sh
 
 # 匯出品質清單
-python scripts/analyze_quality_data.py --export
+python -m src.app analyze --export --output artifacts/quality_list.txt
 ```
 
 ### 3. 執行測試
@@ -156,36 +159,42 @@ python scripts/analyze_quality_data.py --export
 ```
 yolo01/
 ├── src/                                  # 核心程式碼
-│   ├── app/                             # 主程式與 CLI
+│   ├── app/                             # 主程式與統一 CLI
+│   │   ├── cli.py                       # 統一命令列介面
 │   │   ├── realtime.py                  # 即時推論（含品質標記）
 │   │   ├── __main__.py                  # CLI 入口點
 │   │   └── __init__.py
+│   ├── analysis/                        # 資料分析模組
+│   │   └── analyze_quality_data.py      # 品質資料分析
 │   ├── camera/                          # 攝影機串流模組
-│   │   ├── stream.py                    # VideoStream 類別
-│   │   └── __init__.py
+│   │   └── stream.py                    # VideoStream 類別
+│   ├── data_utils/                      # 資料處理工具
+│   │   ├── prepare_quality_dataset.py   # 準備訓練資料集
+│   │   └── verify_dataset.py            # 驗證資料集
 │   ├── detector/                        # YOLO 偵測器
-│   │   ├── yolo.py                      # YoloDetector 類別
-│   │   └── __init__.py
+│   │   └── yolo.py                      # YoloDetector 類別
+│   ├── evaluation/                      # 模型評估
+│   │   └── evaluate_pedestrian.py       # 評估模型性能
+│   ├── inference/                       # 推論模組
+│   │   └── quality_inspector.py         # 品質檢測系統
+│   ├── training/                        # 模型訓練
+│   │   ├── train_pedestrian.py          # 訓練行人偵測
+│   │   └── train_qc.py                  # 訓練品質管理
+│   ├── utils/                           # 工具函式
+│   │   └── check_cuda.py                # 檢查 CUDA
 │   └── visualize/                       # 視覺化工具
-│       ├── overlay.py                   # Overlay 類別
-│       └── __init__.py
+│       └── overlay.py                   # Overlay 類別
 │
-├── scripts/                              # 工具腳本
-│   ├── 品質管理系統
-│   │   ├── analyze_quality_data.py      # 分析品質標記統計
-│   │   ├── prepare_quality_dataset.py   # 準備品質訓練資料集
-│   │   ├── train_qc.py                  # 訓練品質管理模型
-│   │   └── quality_inspector.py         # 品質檢測系統（顯示 0-9 分數）
-│   ├── 行人偵測
-│   │   ├── train_pedestrian.py          # 訓練行人偵測模型
-│   │   └── evaluate_pedestrian.py       # 評估模型
-│   ├── 工具腳本
-│   │   ├── check_cuda.py                # 檢查 CUDA
-│   │   ├── verify_dataset.py            # 驗證資料集
-│   │   ├── install_with_uv.sh           # 安裝環境
-│   │   ├── download_pedestrian_data.sh  # 下載資料集
-│   │   ├── train_all.sh                 # 訓練所有模型
-│   │   └── quality-inspect.sh           # 快速啟動品質檢測
+├── scripts/                              # Shell 腳本工具
+│   ├── 0-install_with_uv.sh             # 安裝環境
+│   ├── 1-label-capture.sh               # 快速啟動標記模式
+│   ├── 2-label-analyze.sh               # 分析品質資料
+│   ├── 3-label-prepare-train.sh         # 準備訓練資料
+│   ├── 4-label-train.sh                 # 訓練模型
+│   ├── 5-label-prev.sh                  # 品質檢測預覽
+│   ├── download_pedestrain_data.sh      # 下載行人資料集
+│   ├── test_data.sh                     # 測試資料集
+│   └── train_all.sh                     # 完整訓練流程
 │
 ├── tests/                                # 測試程式
 │   ├── conftest.py                      # Pytest 配置
@@ -351,16 +360,16 @@ python -m src.app \
 python -m src.app --source 0 --show
 
 # 2. 分析資料分布
-python scripts/analyze_quality_data.py
+python -m src.app analyze
 
 # 3. 準備訓練資料集
-python scripts/prepare_quality_dataset.py --mode quality
+python -m src.app prepare-data --mode quality
 
 # 4. 訓練模型
 bash scripts/train_all.sh
 
 # 5. 啟動品質檢測（顯示 0-9 品質分數）
-python scripts/quality_inspector.py \
+python -m src.app inspect \
     --model artifacts/runs/qc/quality_control_v13/weights/best.pt \
     --source 0 \
     --device cuda
@@ -377,34 +386,34 @@ python scripts/quality_inspector.py \
 
 2. **分析統計**：
    ```bash
-   python scripts/analyze_quality_data.py
+   python -m src.app analyze
    # 顯示各品質等級分布和平均品質
    ```
 
 3. **準備資料集**：
    ```bash
    # 二分類（good/defect）
-   python scripts/prepare_quality_dataset.py --mode binary
+   python -m src.app prepare-data --mode binary
 
    # 三分類（good/minor_defect/major_defect）
-   python scripts/prepare_quality_dataset.py --mode triclass
+   python -m src.app prepare-data --mode triclass
 
    # 10 級品質分類（quality_0 ~ quality_9）
-   python scripts/prepare_quality_dataset.py --mode quality
+   python -m src.app prepare-data --mode quality
    ```
 
 4. **訓練模型**：
    ```bash
-   python scripts/train_qc.py \
-       --data data/quality_scores/dataset.yaml \
+   python -m src.app train-qc \
+       --data data/quality_control/dataset.yaml \
        --model yolov8n.pt \
        --epochs 50 \
-       --device cuda
+       --device 0
    ```
 
 5. **品質檢測**：
    ```bash
-   python scripts/quality_inspector.py \
+   python -m src.app inspect \
        --model artifacts/runs/qc/quality_control_v13/weights/best.pt \
        --source 0 \
        --conf 0.25 \
@@ -439,13 +448,13 @@ python scripts/quality_inspector.py \
 bash ./scripts/download_pedestrian_data.sh
 
 # 驗證資料集
-python scripts/verify_dataset.py --yaml data/pedestrian.yaml
+python -m src.app verify-data --config data/pedestrian.yaml
 ```
 
 2. **訓練模型**：
 ```bash
-python scripts/train_pedestrian.py \
-    --data data/pedestrian.yaml \
+python -m src.app train-pedestrian \
+    --config data/pedestrian.yaml \
     --model yolov8s.pt \
     --epochs 50 \
     --imgsz 640
@@ -453,7 +462,9 @@ python scripts/train_pedestrian.py \
 
 3. **評估模型**：
 ```bash
-python scripts/evaluate_pedestrian.py
+python -m src.app eval \
+    --weights artifacts/runs/train/exp/weights/best.pt \
+    --config data/pedestrian.yaml
 ```
 
 ### 模型匯出
@@ -558,18 +569,46 @@ python -m src.app --source 1 --names data/custom.yaml --show
 python -m src.app --source 0 --model yolov8n.pt --conf 0.3 --device cuda --show
 ```
 
-### train_pedestrian.py 參數
+### 統一 CLI 命令
+
+本專案使用統一的 CLI 介面 `python -m src.app [COMMAND]`：
 
 ```bash
-python scripts/train_pedestrian.py [OPTIONS]
+# 查看所有可用命令
+python -m src.app --help
 
-選項:
-  --data PATH           資料集 YAML 檔案
-  --model MODEL         基礎模型（yolov8n/s/m/l/x.pt）
-  --epochs N            訓練輪數（預設：50）
-  --imgsz SIZE          影像大小（預設：640）
-  --batch SIZE          批次大小（預設：16）
-  --device DEVICE       運算設備（cpu/cuda）
+# 可用的子命令：
+  realtime          即時偵測應用
+  train-pedestrian  訓練行人偵測模型
+  train-qc          訓練品質管理模型
+  eval              評估模型性能
+  verify-data       驗證資料集結構
+  prepare-data      準備訓練資料集
+  analyze           分析品質標記資料
+  inspect           即時品質檢測
+  check-cuda        檢查 CUDA 環境
+```
+
+**常用命令範例**：
+
+```bash
+# 即時偵測
+python -m src.app realtime --source 0 --show
+
+# 訓練品質管理模型
+python -m src.app train-qc --data data/quality_control/dataset.yaml --epochs 50
+
+# 品質檢測
+python -m src.app inspect --model artifacts/runs/qc/quality_control_v13/weights/best.pt --source 0
+
+# 分析品質資料
+python -m src.app analyze
+
+# 評估模型
+python -m src.app eval --weights path/to/best.pt --config data/dataset.yaml
+
+# 檢查 CUDA
+python -m src.app check-cuda
 ```
 
 ## 系統需求
