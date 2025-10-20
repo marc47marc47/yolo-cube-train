@@ -205,7 +205,9 @@ yolo01/
 │   │   ├── quality_0/ ~ quality_9/      # 品質等級 0-9
 │   │   └── unlabeled/                   # 未標記
 │   └── runs/qc/                         # 訓練結果
-│       └── quality_control_v12/         # 最新模型
+│       ├── quality_control_v1/          # 二分類模型 (good/defect)
+│       ├── quality_control_v12/         # 10 級品質模型
+│       └── quality_control_v13/         # 10 級品質模型（最新）
 │           └── weights/best.pt
 │
 ├── 文件                                  # 說明文件
@@ -359,7 +361,7 @@ bash scripts/train_all.sh
 
 # 5. 啟動品質檢測（顯示 0-9 品質分數）
 python scripts/quality_inspector.py \
-    --model artifacts/runs/qc/quality_control_v12/weights/best.pt \
+    --model artifacts/runs/qc/quality_control_v13/weights/best.pt \
     --source 0 \
     --device cuda
 ```
@@ -403,7 +405,7 @@ python scripts/quality_inspector.py \
 5. **品質檢測**：
    ```bash
    python scripts/quality_inspector.py \
-       --model artifacts/runs/qc/quality_control_v12/weights/best.pt \
+       --model artifacts/runs/qc/quality_control_v13/weights/best.pt \
        --source 0 \
        --conf 0.25 \
        --device cuda
@@ -772,6 +774,39 @@ pytest tests/ -v -m unit
 # 跳過慢速測試
 pytest tests/ -v -m "not slow"
 ```
+
+#### 9. 模型評估類別匹配錯誤
+
+**錯誤訊息**：
+```
+IndexError: index 5 is out of bounds for axis 1 with size 3
+```
+
+**原因**：使用錯誤的模型權重文件（類別數量不匹配）
+
+**解決方案**：
+```bash
+# 1. 檢查可用的訓練模型
+ls -la artifacts/runs/qc/*/weights/best.pt
+
+# 2. 確認模型類別數量
+python -c "
+from ultralytics import YOLO
+model = YOLO('artifacts/runs/qc/quality_control_v13/weights/best.pt')
+print(f'Classes: {model.model.nc}')
+print(f'Names: {model.names}')
+"
+
+# 3. 使用正確的模型進行評估
+python -m src.app eval \
+  --weights artifacts/runs/qc/quality_control_v13/weights/best.pt \
+  --config data/quality_control/dataset.yaml \
+  --device 0
+```
+
+**模型版本說明**：
+- `quality_control_v1`: 2 類別 (good, defect) - 適用於二分類
+- `quality_control_v12/v13`: 10 類別 (quality_0-9) - 適用於品質評分
 
 ### 效能基準
 

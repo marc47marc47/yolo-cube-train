@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Helper script to launch a full training + validation cycle with sensible defaults.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+function log() {
+    printf '[train_all] %s\n' "$*"
+}
+
+function resolve_python() {
+    if [[ -x "${ROOT_DIR}/yolo/Scripts/python.exe" ]]; then
+        echo "${ROOT_DIR}/yolo/Scripts/python.exe"
+    elif [[ -x "${ROOT_DIR}/yolo/bin/python" ]]; then
+        echo "${ROOT_DIR}/yolo/bin/python"
+    else
+        log "Could not find virtualenv under ${ROOT_DIR}/yolo. Run scripts/install_with_uv.sh first."
+        exit 1
+    fi
+}
+
+PYTHON_BIN="$(resolve_python)"
+
+DATA_YAML="${DATA_YAML:-${ROOT_DIR}/data/quality_control/dataset.yaml}"
+SCREENSHOTS_DIR="${SCREENSHOTS_DIR:-${ROOT_DIR}/artifacts/screenshots}"
+DATA_MODE="${DATA_MODE:-binary}"
+MODEL_PATH="${MODEL:-${ROOT_DIR}/yolov8n.pt}"
+EPOCHS="${EPOCHS:-50}"
+IMGSZ="${IMGSZ:-640}"
+BATCH="${BATCH:-16}"
+DEVICE="${DEVICE:-0}"
+PROJECT="${PROJECT:-artifacts/runs/qc}"
+RUN_NAME="${NAME:-quality_control_v1}"
+
+
+log "Starting training run '${RUN_NAME}' (epochs=${EPOCHS}, imgsz=${IMGSZ}, batch=${BATCH}, device=${DEVICE})."
+"${PYTHON_BIN}" -m src.app train-qc \
+    --data "${DATA_YAML}" \
+    --model "${MODEL_PATH}" \
+    --epochs "${EPOCHS}" \
+    --imgsz "${IMGSZ}" \
+    --batch "${BATCH}" \
+    --device "${DEVICE}" \
+    --project "${PROJECT}" \
+    --name "${RUN_NAME}" \
+    "$@"
+
+if [[ "${PROJECT}" = /* ]]; then
+    WEIGHTS_DIR="${PROJECT}/${RUN_NAME}/weights"
+else
+    WEIGHTS_DIR="${ROOT_DIR}/${PROJECT}/${RUN_NAME}/weights"
+fi
+
+BEST_WEIGHTS="${WEIGHTS_DIR}/best.pt"
+
+if [[ -f "${BEST_WEIGHTS}" ]]; then
+    log "Running validation for ${BEST_WEIGHTS}."
+    "${PYTHON_BIN}" -m src.app eval \
+        --weights "${BEST_WEIGHTS}" \
+        --config "${DATA_YAML}" \
+        --device "${DEVICE}" || log "Validation step reported errors."
+else
+    log "Best weights not found at ${BEST_WEIGHTS}; skipping validation."
+fi
+
+log "Run finished."

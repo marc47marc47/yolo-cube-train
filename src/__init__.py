@@ -1,2 +1,2 @@
-"""YOLO camera detection project."""
-__version__ = "0.1.0"
+"""YOLO 项目主模块"""
+__version__ = "1.0.0"

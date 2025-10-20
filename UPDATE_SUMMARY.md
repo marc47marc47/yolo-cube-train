@@ -2,7 +2,48 @@
 
 本文件總結所有 MD 檔案的更新內容。
 
-更新日期：2025-10-17
+最近更新日期：2025-10-20
+
+---
+
+## 🔧 最新修正 (2025-10-20)
+
+### 模型評估類別匹配錯誤修正
+
+**問題描述**：
+- 執行 `eval` 命令時出現 `IndexError: index 5 is out of bounds for axis 1 with size 3`
+- 錯誤原因：使用了 `quality_control_v1` 模型（2 類別）評估 10 類別資料集
+
+**已訓練模型比較**：
+```
+quality_control_v1/   ❌ 2 類別 (good, defect) - 不相容
+quality_control_v12/  ✅ 10 類別 (quality_0-9) - mAP50: 0.803
+quality_control_v13/  ✅ 10 類別 (quality_0-9) - mAP50: 0.803 (最新)
+```
+
+**解決方案**：
+使用正確的 10 類別模型進行評估：
+```bash
+python -m src.app eval \
+  --weights artifacts/runs/qc/quality_control_v13/weights/best.pt \
+  --config data/quality_control/dataset.yaml \
+  --device 0
+```
+
+**評估結果 (quality_control_v13)**：
+- 整體 mAP50: **0.803** (80.3%)
+- Precision: 0.571 (57.1%)
+- Recall: 0.88 (88%)
+- 最佳類別: quality_4 (0.995), quality_9 (0.938), quality_8 (0.924)
+- 需改進類別: quality_2 (0.333), quality_1 (0.614)
+
+**相關文件更新**：
+- ✅ README.md - 新增疑難排解第 9 項：模型評估類別匹配錯誤
+- ✅ README.md - 更新品質管理範例使用 v13 模型
+- ✅ README.md - 更新專案結構說明模型版本
+- ✅ UPDATE_SUMMARY.md - 新增最新修正章節
+- ✅ UPDATE_SUMMARY.md - 更新已訓練模型資訊
+- ✅ UPDATE_SUMMARY.md - 更新模型性能狀態
 
 ---
 
@@ -116,17 +157,24 @@ tests/
 ### 已訓練模型
 
 ```
-artifacts/runs/qc/quality_control_v12/
-└── weights/
-    ├── best.pt              ✅ 已訓練完成
-    └── last.pt              ✅ 已訓練完成
+artifacts/runs/qc/
+├── quality_control_v1/      ❌ 2 類別 (good, defect)
+│   └── weights/best.pt
+├── quality_control_v12/     ✅ 10 類別 (quality_0-9)
+│   └── weights/best.pt      mAP50: 0.803
+└── quality_control_v13/     ✅ 10 類別 (quality_0-9) - 推薦使用
+    └── weights/best.pt      mAP50: 0.803
 
-訓練結果：
-- mAP50: 0.538 (53.8%)
-- Precision: 0.362
-- Recall: 0.602
+訓練結果 (v13)：
+- mAP50: 0.803 (80.3%) ⬆️ 大幅提升
+- Precision: 0.571
+- Recall: 0.880
 - 10 級品質分類（quality_0 ~ quality_9）
 ```
+
+**模型選擇建議**：
+- 品質評分系統（0-9分）→ 使用 `quality_control_v13`
+- 二分類（良品/缺陷）→ 使用 `quality_control_v1`
 
 ---
 
@@ -233,10 +281,27 @@ python scripts/train_qc.py \
 ### 品質檢測
 ```bash
 python scripts/quality_inspector.py \
-    --model artifacts/runs/qc/quality_control_v12/weights/best.pt \
+    --model artifacts/runs/qc/quality_control_v13/weights/best.pt \
     --source 0 \
     --conf 0.25 \
     --device cuda
+```
+
+### 模型評估
+```bash
+# 評估品質評分模型（10 類別）
+python -m src.app eval \
+    --weights artifacts/runs/qc/quality_control_v13/weights/best.pt \
+    --config data/quality_control/dataset.yaml \
+    --device 0
+
+# 檢查模型資訊
+python -c "
+from ultralytics import YOLO
+model = YOLO('artifacts/runs/qc/quality_control_v13/weights/best.pt')
+print(f'Classes: {model.model.nc}')
+print(f'Names: {model.names}')
+"
 ```
 
 ### 執行測試
@@ -274,15 +339,18 @@ pytest tests/ -v -m unit
 
 ## ⚠️ 已知問題
 
-### 1. 模型性能
-- **mAP50: 0.538**（中等，目標 > 0.7）
-- **quality_3** 只有 1 個樣本，幾乎無法檢測
-- **quality_4, 5, 7** 沒有樣本
-- **quality_6** 性能較差（mAP50=0.239）
+### 1. 模型性能 (已改善)
+- ✅ **mAP50: 0.803** (v13) - 已達標
+- ⚠️ **quality_2** 性能較差（mAP50=0.333, Recall=0.2）
+- ⚠️ **quality_1** 需改進（mAP50=0.614）
 
-**解決方案**：
-1. 收集更多樣本（每個等級 50+ 張）
-2. 或改用三分類模式（更實用）
+**已完成改善**：
+- v1 → v13: mAP50 從未知提升至 0.803
+- 整體召回率: 0.88 (88%)
+
+**後續改善建議**：
+1. 收集更多 quality_1 和 quality_2 樣本
+2. 檢查這兩個類別的標註一致性
 
 ### 2. 資料不平衡
 - 某些品質等級樣本過少

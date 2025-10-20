@@ -1,1 +1,0 @@
-python scripts/analyze_quality_data.py

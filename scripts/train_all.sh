@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 function log() {
-    printf '[run_basic] %s\n' "$*"
+    printf '[train_all] %s\n' "$*"
 }
 
 function resolve_python() {
@@ -36,7 +36,7 @@ RUN_NAME="${NAME:-quality_control_v1}"
 
 if [[ ! -f "${DATA_YAML}" ]]; then
     log "Dataset yaml not found at ${DATA_YAML}; preparing dataset from ${SCREENSHOTS_DIR}."
-    "${PYTHON_BIN}" "${ROOT_DIR}/scripts/prepare_quality_dataset.py" \
+    "${PYTHON_BIN}" -m src.app prepare-data \
         --screenshots "${SCREENSHOTS_DIR}" \
         --output "${ROOT_DIR}/data/quality_control" \
         --mode "${DATA_MODE}"
@@ -44,7 +44,7 @@ if [[ ! -f "${DATA_YAML}" ]]; then
 fi
 
 log "Starting training run '${RUN_NAME}' (epochs=${EPOCHS}, imgsz=${IMGSZ}, batch=${BATCH}, device=${DEVICE})."
-"${PYTHON_BIN}" "${ROOT_DIR}/scripts/train_qc.py" \
+"${PYTHON_BIN}" -m src.app train-qc \
     --data "${DATA_YAML}" \
     --model "${MODEL_PATH}" \
     --epochs "${EPOCHS}" \
@@ -65,10 +65,10 @@ BEST_WEIGHTS="${WEIGHTS_DIR}/best.pt"
 
 if [[ -f "${BEST_WEIGHTS}" ]]; then
     log "Running validation for ${BEST_WEIGHTS}."
-    "${PYTHON_BIN}" -m ultralytics val \
-        model="${BEST_WEIGHTS}" \
-        data="${DATA_YAML}" \
-        device="${DEVICE}" || log "Validation step reported errors."
+    "${PYTHON_BIN}" -m src.app eval \
+        --weights "${BEST_WEIGHTS}" \
+        --config "${DATA_YAML}" \
+        --device "${DEVICE}" || log "Validation step reported errors."
 else
     log "Best weights not found at ${BEST_WEIGHTS}; skipping validation."
 fi

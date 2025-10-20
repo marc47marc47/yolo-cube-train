@@ -1,0 +1,7 @@
+path: reference/pedestrian
+train: train2017/images
+val: val2017/images
+test: val2017/images
+nc: 1
+names:
+  - person

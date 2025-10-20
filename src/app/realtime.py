@@ -30,6 +30,12 @@ def parse_args() -> argparse.Namespace:
         default=Path("data/pedestrian.yaml"),
         help="YAML file defining class names (used for overlay).",
     )
+    parser.add_argument(
+        "--mode",
+        choices=("detect", "capture"),
+        default="detect",
+        help="Select 'capture' to grab raw frames without drawing detection boxes.",
+    )
     return parser.parse_args()
 
 
@@ -63,10 +69,28 @@ def main() -> int:
     except (ValueError, TypeError):
         source = args.source
 
-    detector = YoloDetector(model_path=args.model, device=args.device, conf=args.conf, iou=args.iou)
-    class_names = YoloDetector.load_labels(args.names)
-    overlay = Overlay(class_names)
+    detection_enabled = args.mode == "detect"
+    detector: Optional[YoloDetector] = None
+    overlay: Optional[Overlay] = None
+
+    if detection_enabled:
+        detector = YoloDetector(model_path=args.model, device=args.device, conf=args.conf, iou=args.iou)
+        class_names = YoloDetector.load_labels(args.names)
+        overlay = Overlay(class_names)
+    else:
+        print("[realtime] Capture mode enabled (raw frames, no overlays).")
     stream_config = StreamConfig(source=source, width=args.width, height=args.height)
+
+    stream = VideoStream(stream_config)
+    try:
+        stream.open()
+    except RuntimeError as exc:
+        if isinstance(source, int):
+            print(f"[realtime] Camera index {source} not available.")
+        else:
+            print(f"[realtime] Unable to open video source '{source}'.")
+        print(f"[realtime] Details: {exc}")
+        return 1
 
     recording = False
     video_writer: Optional[cv2.VideoWriter] = None
@@ -87,7 +111,7 @@ def main() -> int:
         video_writer = None
         current_video_path = None
 
-    with VideoStream(stream_config) as stream:
+    with stream:
 
         def start_recording(frame: np.ndarray) -> None:
             nonlocal recording, video_writer, current_video_path, recorded_frames, recorded_fps
@@ -116,16 +140,18 @@ def main() -> int:
 
         try:
             for raw_frame in stream.frames():
-                results = detector.predict(raw_frame, stream=False)
-                boxes = to_boxes(results[0]) if results else []
-                annotated = overlay.draw(raw_frame, boxes)
+                display_frame = raw_frame
+                if detection_enabled and detector is not None and overlay is not None:
+                    results = detector.predict(raw_frame, stream=False)
+                    boxes = to_boxes(results[0]) if results else []
+                    display_frame = overlay.draw(raw_frame, boxes)
 
                 if recording and video_writer is not None:
                     video_writer.write(raw_frame)
                     recorded_frames += 1
 
                 if args.show:
-                    cv2.imshow("YOLO Realtime", annotated)
+                    cv2.imshow("YOLO Realtime", display_frame)
                     key = cv2.waitKey(1) & 0xFF
 
                     if key in (ord("q"), 27):
@@ -137,7 +163,7 @@ def main() -> int:
                         out_dir.mkdir(parents=True, exist_ok=True)
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
                         filename = out_dir / f"q{quality}_{timestamp}.jpg"
-                        cv2.imwrite(str(filename), annotated)
+                        cv2.imwrite(str(filename), display_frame)
                         print(f"[capture] quality={quality} saved {filename}")
 
                     elif key == ord("s"):
@@ -145,7 +171,7 @@ def main() -> int:
                         out_dir.mkdir(parents=True, exist_ok=True)
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
                         filename = out_dir / f"capture_{timestamp}.jpg"
-                        cv2.imwrite(str(filename), annotated)
+                        cv2.imwrite(str(filename), display_frame)
                         print(f"[capture] unlabeled saved {filename}")
 
                     elif key == ord("v"):
